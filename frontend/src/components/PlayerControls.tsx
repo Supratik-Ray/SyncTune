@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Play,
   Pause,
@@ -44,25 +44,32 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onVolumeChange,
   onToggleMute,
 }) => {
-  // Scrubbing/dragging state to prevent flooding seeks while sliding on mobile
+  // Scrubbing/dragging state using both state (for 60fps UI render) and ref (to strictly avoid duplicate commits)
   const [isDragging, setIsDragging] = useState(false);
   const [dragTime, setDragTime] = useState(0);
+  const isDraggingRef = useRef(false);
+  const dragTimeRef = useRef(0);
 
   const displayTime = isDragging ? dragTime : currentTime;
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDragTime(parseFloat(e.target.value));
+    const val = parseFloat(e.target.value);
+    dragTimeRef.current = val;
+    setDragTime(val);
   };
 
   const handlePointerDown = () => {
+    isDraggingRef.current = true;
     setIsDragging(true);
+    dragTimeRef.current = currentTime;
     setDragTime(currentTime);
   };
 
   const handlePointerUp = () => {
-    if (isDragging) {
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
       setIsDragging(false);
-      onSeek(dragTime);
+      onSeek(dragTimeRef.current);
     }
   };
 
@@ -92,8 +99,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             disabled={!currentVideo}
             onPointerDown={handlePointerDown}
             onPointerUp={handlePointerUp}
-            onTouchStart={handlePointerDown}
-            onTouchEnd={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onChange={handleSliderChange}
             onKeyUp={handleKeyUp}
             className="seek-slider w-full h-8"
@@ -189,8 +195,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 disabled={!currentVideo}
                 onPointerDown={handlePointerDown}
                 onPointerUp={handlePointerUp}
-                onTouchStart={handlePointerDown}
-                onTouchEnd={handlePointerUp}
+                onPointerCancel={handlePointerUp}
                 onChange={handleSliderChange}
                 onKeyUp={handleKeyUp}
                 className="seek-slider w-full h-5"

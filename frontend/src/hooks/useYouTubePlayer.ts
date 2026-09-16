@@ -41,6 +41,7 @@ export function useYouTubePlayer({
   const isApplyingRemoteUpdate = useRef(false);
   const lastLoadedVideoIdRef = useRef<string | null>(null);
   const lastSeekTimeRef = useRef<number>(0);
+  const prevBaseTimeRef = useRef<number>(baseTime);
   const containerId = "youtube-player-element";
 
   // Fresh references to prevent stale closures in async callbacks & events
@@ -162,7 +163,9 @@ export function useYouTubePlayer({
                   videoId: latestVid.videoId,
                   startSeconds: currentExpected,
                 });
-              } else {
+              } else if (currentExpected > 1.5) {
+                // Only seek on late joiners entering halfway through!
+                // If song just started (<= 1.5s), playerVars.start already begins from 0!
                 event.target.seekTo(currentExpected, true);
               }
 
@@ -191,10 +194,16 @@ export function useYouTubePlayer({
 
               const currentTime = playerRef.current.getCurrentTime?.() || 0;
 
+              // CRITICAL: Only broadcast if local action actually changed room play state.
+              // Never echo PLAYING if the room is ALREADY playing, breaking feedback loops!
               if (event.data === window.YT.PlayerState.PLAYING) {
-                onPlayRef.current(currentTime);
+                if (!isPlayingRef.current) {
+                  onPlayRef.current(currentTime);
+                }
               } else if (event.data === window.YT.PlayerState.PAUSED) {
-                onPauseRef.current(currentTime);
+                if (isPlayingRef.current) {
+                  onPauseRef.current(currentTime);
+                }
               }
             },
             onError: (event: any) => {
@@ -262,39 +271,56 @@ export function useYouTubePlayer({
 
       setTimeout(() => {
         isApplyingRemoteUpdate.current = false;
-      }, 600);
+      }, 800);
     }
   }, [activeVideoId, playerReady, isPlaying, getExpectedRoomTime]);
 
   // 4. Synchronize Play/Pause when roomState changes remotely
+  // (Notice: strictly no seekTo here to eliminate buffering interruptions!)
   useEffect(() => {
-    if (!playerRef.current || !playerReady || !currentVideo) return;
+    if (!playerRef.current || !playerReady) return;
 
     try {
       const playerState = playerRef.current.getPlayerState?.();
       const isPlayerPlaying = playerState === window.YT?.PlayerState?.PLAYING;
+      const isPlayerBuffering =
+        playerState === window.YT?.PlayerState?.BUFFERING;
 
-      if (isPlaying && !isPlayerPlaying) {
-        isApplyingRemoteUpdate.current = true;
-        const expected = getExpectedRoomTime();
-        playerRef.current.seekTo(expected, true);
-        playerRef.current.playVideo();
-        setTimeout(() => {
-          isApplyingRemoteUpdate.current = false;
-        }, 300);
-      } else if (!isPlaying && isPlayerPlaying) {
-        isApplyingRemoteUpdate.current = true;
-        const expected = getExpectedRoomTime();
-        playerRef.current.seekTo(expected, true);
-        playerRef.current.pauseVideo();
-        setTimeout(() => {
-          isApplyingRemoteUpdate.current = false;
-        }, 300);
+      if (isPlaying) {
+        if (!isPlayerPlaying && !isPlayerBuffering) {
+          playerRef.current.playVideo();
+        }
+      } else {
+        if (isPlayerPlaying || isPlayerBuffering) {
+          playerRef.current.pauseVideo();
+        }
       }
     } catch (_) {}
-  }, [isPlaying, currentVideo, playerReady, getExpectedRoomTime]);
+  }, [isPlaying, playerReady]);
 
-  // 5. Autoplay Blocked Detector:
+  // 5. Synchronize Remote Seeks smoothly
+  useEffect(() => {
+    if (Math.abs(baseTime - prevBaseTimeRef.current) > 1.5) {
+      prevBaseTimeRef.current = baseTime;
+      if (!playerRef.current || !playerReady) return;
+      if (isApplyingRemoteUpdate.current) return;
+
+      lastSeekTimeRef.current = Date.now();
+      isApplyingRemoteUpdate.current = true;
+      try {
+        const expected = getExpectedRoomTime();
+        playerRef.current.seekTo(expected, true);
+        setLocalCurrentTime(expected);
+      } catch (_) {}
+      setTimeout(() => {
+        isApplyingRemoteUpdate.current = false;
+      }, 2000);
+    } else {
+      prevBaseTimeRef.current = baseTime;
+    }
+  }, [baseTime, playerReady, getExpectedRoomTime]);
+
+  // 6. Autoplay Blocked Detector:
   // Detects if the room is playing but the browser blocked autoplay without interaction
   useEffect(() => {
     if (!playerReady || !currentVideo || !isPlaying) {
@@ -314,12 +340,12 @@ export function useYouTubePlayer({
           }
         } catch (_) {}
       }
-    }, 1200);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [isPlaying, currentVideo, playerReady]);
 
-  // 6. Periodic Drift Correction & Progress Tracker
+  // 7. Periodic Drift Correction & Progress Tracker
   useEffect(() => {
     const interval = setInterval(() => {
       if (!playerRef.current || !playerReady || !currentVideo) return;
@@ -333,27 +359,30 @@ export function useYouTubePlayer({
         }
 
         // Do not perform drift correction if:
-        // 1. A seek was recently performed within the last 2.5 seconds (gives mobile time to buffer)
-        // 2. The player is currently buffering (state 3), unstarted (-1), or paused (2)
-        const isRecentSeek = Date.now() - lastSeekTimeRef.current < 2500;
+        // 1. A seek was recently performed within the last 3.0 seconds (gives mobile decoders time to buffer)
+        // 2. We are currently applying a remote/local update
+        // 3. The player is NOT actively playing (state 1 = PLAYING).
+        // If buffering (3), unstarted (-1), or paused (2), NEVER interrupt it!
+        const isRecentSeek = Date.now() - lastSeekTimeRef.current < 3000;
         const playerState = playerRef.current.getPlayerState?.();
 
         if (
           isPlaying &&
           !isApplyingRemoteUpdate.current &&
           !isRecentSeek &&
-          playerState === 1 // Strictly state 1 = PLAYING
+          playerState === window.YT?.PlayerState?.PLAYING
         ) {
           const expected = getExpectedRoomTime();
           const drift = Math.abs(expected - localTime);
 
-          // Threshold 1.5s avoids micro-stutters and mobile frame drops
-          if (drift > 1.5) {
+          // Threshold 2.0s avoids micro-stutters and mobile frame drops entirely
+          if (drift > 2.0) {
+            lastSeekTimeRef.current = Date.now();
             isApplyingRemoteUpdate.current = true;
-            playerRef.current.seekTo(expected, true);
+            playerRef.current.seekTo?.(expected, true);
             setTimeout(() => {
               isApplyingRemoteUpdate.current = false;
-            }, 600);
+            }, 1000);
           }
         }
       } catch (_) {}
@@ -362,7 +391,7 @@ export function useYouTubePlayer({
     return () => clearInterval(interval);
   }, [isPlaying, playerReady, currentVideo, getExpectedRoomTime]);
 
-  // 7. Cleanup on unmount
+  // 8. Cleanup on unmount
   useEffect(() => {
     return () => {
       if (playerRef.current) {
@@ -380,6 +409,7 @@ export function useYouTubePlayer({
     if (!playerRef.current) return;
     setAutoplayBlocked(false);
     isApplyingRemoteUpdate.current = true;
+    lastSeekTimeRef.current = Date.now();
     const expected = getExpectedRoomTime();
     try {
       playerRef.current.seekTo?.(expected, true);
@@ -392,7 +422,7 @@ export function useYouTubePlayer({
     }
     setTimeout(() => {
       isApplyingRemoteUpdate.current = false;
-    }, 500);
+    }, 1000);
   }, [getExpectedRoomTime]);
 
   // User Control Handlers (triggered from UI player bar)
@@ -426,7 +456,7 @@ export function useYouTubePlayer({
     }
     setTimeout(() => {
       isApplyingRemoteUpdate.current = false;
-    }, 1500);
+    }, 2000);
     onSeekRef.current(newTime);
   }, []);
 
