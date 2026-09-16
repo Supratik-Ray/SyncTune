@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Play,
   Pause,
@@ -44,6 +44,35 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onVolumeChange,
   onToggleMute,
 }) => {
+  // Scrubbing/dragging state to prevent flooding seeks while sliding on mobile
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragTime, setDragTime] = useState(0);
+
+  const displayTime = isDragging ? dragTime : currentTime;
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDragTime(parseFloat(e.target.value));
+  };
+
+  const handlePointerDown = () => {
+    setIsDragging(true);
+    setDragTime(currentTime);
+  };
+
+  const handlePointerUp = () => {
+    if (isDragging) {
+      setIsDragging(false);
+      onSeek(dragTime);
+    }
+  };
+
+  const handleKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const val = parseFloat((e.target as HTMLInputElement).value);
+      onSeek(val);
+    }
+  };
+
   return (
     <div className="bg-surface-card/95 backdrop-blur-xl border-t border-surface-border px-3 py-2.5 sm:py-0 sm:px-6 z-30 select-none flex flex-col justify-center sm:h-24">
       {/* ========================================================================= */}
@@ -51,7 +80,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       {/* ========================================================================= */}
       <div className="flex sm:hidden items-center space-x-2 w-full pb-2">
         <span className="text-[11px] font-mono text-zinc-400 min-w-[34px] text-right">
-          {formatTime(currentTime)}
+          {formatTime(displayTime)}
         </span>
         <div className="relative flex-1 flex items-center py-2">
           <input
@@ -59,9 +88,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             min={0}
             max={duration || 100}
             step={0.5}
-            value={currentTime}
+            value={displayTime}
             disabled={!currentVideo}
-            onChange={(e) => onSeek(parseFloat(e.target.value))}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onTouchStart={handlePointerDown}
+            onTouchEnd={handlePointerUp}
+            onChange={handleSliderChange}
+            onKeyUp={handleKeyUp}
             className="seek-slider w-full h-8"
             aria-label="Seek timeline"
           />
@@ -144,16 +178,21 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
           {/* Desktop-Only Integrated Seekbar */}
           <div className="hidden sm:flex w-full items-center space-x-2 text-[11px] font-mono text-zinc-400">
-            <span className="w-10 text-right">{formatTime(currentTime)}</span>
+            <span className="w-10 text-right">{formatTime(displayTime)}</span>
             <div className="relative flex-1 flex items-center py-1">
               <input
                 type="range"
                 min={0}
                 max={duration || 100}
                 step={0.5}
-                value={currentTime}
+                value={displayTime}
                 disabled={!currentVideo}
-                onChange={(e) => onSeek(parseFloat(e.target.value))}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+                onTouchStart={handlePointerDown}
+                onTouchEnd={handlePointerUp}
+                onChange={handleSliderChange}
+                onKeyUp={handleKeyUp}
                 className="seek-slider w-full h-5"
                 aria-label="Seek timeline"
               />

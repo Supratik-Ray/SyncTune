@@ -40,6 +40,7 @@ export function useYouTubePlayer({
   const playerRef = useRef<any>(null);
   const isApplyingRemoteUpdate = useRef(false);
   const lastLoadedVideoIdRef = useRef<string | null>(null);
+  const lastSeekTimeRef = useRef<number>(0);
   const containerId = "youtube-player-element";
 
   // Fresh references to prevent stale closures in async callbacks & events
@@ -331,17 +332,28 @@ export function useYouTubePlayer({
           setDuration(vidDuration);
         }
 
-        if (isPlaying && !isApplyingRemoteUpdate.current) {
+        // Do not perform drift correction if:
+        // 1. A seek was recently performed within the last 2.5 seconds (gives mobile time to buffer)
+        // 2. The player is currently buffering (state 3), unstarted (-1), or paused (2)
+        const isRecentSeek = Date.now() - lastSeekTimeRef.current < 2500;
+        const playerState = playerRef.current.getPlayerState?.();
+
+        if (
+          isPlaying &&
+          !isApplyingRemoteUpdate.current &&
+          !isRecentSeek &&
+          playerState === 1 // Strictly state 1 = PLAYING
+        ) {
           const expected = getExpectedRoomTime();
           const drift = Math.abs(expected - localTime);
 
-          // If drift exceeds 0.75s, smoothly align
-          if (drift > 0.75) {
+          // Threshold 1.5s avoids micro-stutters and mobile frame drops
+          if (drift > 1.5) {
             isApplyingRemoteUpdate.current = true;
             playerRef.current.seekTo(expected, true);
             setTimeout(() => {
               isApplyingRemoteUpdate.current = false;
-            }, 300);
+            }, 600);
           }
         }
       } catch (_) {}
@@ -404,6 +416,7 @@ export function useYouTubePlayer({
   const handleSeek = useCallback((newTime: number) => {
     if (!playerRef.current) return;
     setAutoplayBlocked(false);
+    lastSeekTimeRef.current = Date.now();
     isApplyingRemoteUpdate.current = true;
     try {
       playerRef.current.seekTo?.(newTime, true);
@@ -413,7 +426,7 @@ export function useYouTubePlayer({
     }
     setTimeout(() => {
       isApplyingRemoteUpdate.current = false;
-    }, 300);
+    }, 1500);
     onSeekRef.current(newTime);
   }, []);
 
