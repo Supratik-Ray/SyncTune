@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRoom } from "./hooks/useRoom";
 import { useYouTubePlayer } from "./hooks/useYouTubePlayer";
 import { LandingView } from "./components/LandingView";
@@ -46,12 +46,31 @@ export function App() {
     "queue" | "chat" | "users"
   >("queue");
 
-  // Check URL params for invite link (?room=CODE)
+  const hasAutoJoinedRef = useRef(false);
+
+  // Handle explicit leave room action
+  const handleLeaveRoom = useCallback(() => {
+    hasAutoJoinedRef.current = true; // prevent re-auto-joining if ?room= was in URL
+    // Clean up ?room=... from URL bar so it doesn't auto-rejoin
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("room")) {
+      url.searchParams.delete("room");
+      window.history.replaceState(
+        {},
+        "",
+        url.pathname + (url.search ? url.search : ""),
+      );
+    }
+    leaveRoom();
+  }, [leaveRoom]);
+
+  // Check URL params for invite link (?room=CODE) - only auto-join once on initial page load
   useEffect(() => {
+    if (hasAutoJoinedRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const roomFromUrl = params.get("room");
     if (roomFromUrl && !roomState) {
-      // Auto join or allow joining
+      hasAutoJoinedRef.current = true;
       joinRoom(roomFromUrl);
     }
   }, [joinRoom, roomState]);
@@ -64,6 +83,8 @@ export function App() {
     duration,
     volume,
     isMuted,
+    autoplayBlocked,
+    tuneIn,
     togglePlay,
     seek: playerSeek,
     setVolume,
@@ -124,7 +145,7 @@ export function App() {
         roomCode={roomState.code}
         userCount={roomState.users.length}
         connectionStatus={connectionStatus}
-        onLeaveRoom={leaveRoom}
+        onLeaveRoom={handleLeaveRoom}
       />
 
       {/* Transient Toast Notification */}
@@ -176,6 +197,9 @@ export function App() {
               containerId={containerId}
               currentVideo={roomState.currentVideo}
               playerError={playerError}
+              isPlaying={roomState.isPlaying}
+              autoplayBlocked={autoplayBlocked}
+              onTuneIn={tuneIn}
             />
           </div>
         </section>

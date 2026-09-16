@@ -73,7 +73,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           <button
             onClick={handleCopyInvite}
             title="Copy invite link"
-            className="p-1.5 hover:bg-surface-highlight text-zinc-400 hover:text-zinc-100 rounded-lg transition-colors border border-transparent hover:border-surface-border flex items-center space-x-1 text-xs"
+            className="hidden sm:flex p-1.5 hover:bg-surface-highlight text-zinc-400 hover:text-zinc-100 rounded-lg transition-colors border border-transparent hover:border-surface-border items-center space-x-1 text-xs"
           >
             {copiedInvite ? (
               <Check className="w-3.5 h-3.5 text-brand-400" />

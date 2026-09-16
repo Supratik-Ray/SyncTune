@@ -21,7 +21,74 @@
   background: #3f3f4e;
 }
 
-/* Custom range input styling for player seek bar */
-input[type="range"] {
-  accent-color: #10b981;
+/* Custom range input styling for player seek bar & touch dragging */
+input[type="range"].seek-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input[type="range"].seek-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  background-color: #272730;
+  border-radius: 9999px;
+  transition: all 0.15s ease;
+}
+
+input[type="range"].seek-slider:hover::-webkit-slider-runnable-track {
+  height: 8px;
+  background-color: #3f3f4e;
+}
+
+input[type="range"].seek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px; /* Centers thumb on 6px track */
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  transition:
+    transform 0.1s ease,
+    background-color 0.1s ease;
+}
+
+/* Larger, easier-to-grab thumb on touch / active */
+input[type="range"].seek-slider:active::-webkit-slider-thumb {
+  transform: scale(1.35);
+  background-color: #34d399;
+}
+
+/* Firefox */
+input[type="range"].seek-slider::-moz-range-track {
+  height: 6px;
+  background-color: #272730;
+  border-radius: 9999px;
+  transition: all 0.15s ease;
+}
+
+input[type="range"].seek-slider:hover::-moz-range-track {
+  height: 8px;
+  background-color: #3f3f4e;
+}
+
+input[type="range"].seek-slider::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border: none;
+  border-radius: 9999px;
+  background-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  transition:
+    transform 0.1s ease,
+    background-color 0.1s ease;
+}
+
+input[type="range"].seek-slider:active::-moz-range-thumb {
+  transform: scale(1.35);
+  background-color: #34d399;
 }

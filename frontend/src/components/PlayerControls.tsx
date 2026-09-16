@@ -45,114 +45,145 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onToggleMute,
 }) => {
   return (
-    <div className="h-20 sm:h-24 bg-surface-card/95 backdrop-blur-xl border-t border-surface-border px-4 sm:px-6 flex items-center justify-between z-30 select-none">
-      {/* 1. Track Info (Left) */}
-      <div className="flex items-center space-x-3 w-1/4 min-w-[140px] max-w-[280px]">
-        {currentVideo ? (
-          <>
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-base border border-surface-border flex-shrink-0">
-              {currentVideo.thumbnail ? (
-                <img
-                  src={currentVideo.thumbnail}
-                  alt={currentVideo.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-zinc-600">
-                  <Music className="w-5 h-5" />
-                </div>
-              )}
-            </div>
-            <div className="overflow-hidden">
-              <h4 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">
-                {currentVideo.title}
-              </h4>
-              <p className="text-xs text-zinc-400 truncate">
-                {currentVideo.channelTitle || "YouTube Music"}
-              </p>
-            </div>
-          </>
-        ) : (
-          <div className="text-xs text-zinc-500 italic">No track playing</div>
-        )}
+    <div className="bg-surface-card/95 backdrop-blur-xl border-t border-surface-border px-3 py-2.5 sm:py-0 sm:px-6 z-30 select-none flex flex-col justify-center sm:h-24">
+      {/* ========================================================================= */}
+      {/* 1. MOBILE-ONLY TIMELINE ROW (Full width, easy finger dragging)           */}
+      {/* ========================================================================= */}
+      <div className="flex sm:hidden items-center space-x-2 w-full pb-2">
+        <span className="text-[11px] font-mono text-zinc-400 min-w-[34px] text-right">
+          {formatTime(currentTime)}
+        </span>
+        <div className="relative flex-1 flex items-center py-2">
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            step={0.5}
+            value={currentTime}
+            disabled={!currentVideo}
+            onChange={(e) => onSeek(parseFloat(e.target.value))}
+            className="seek-slider w-full h-8"
+            aria-label="Seek timeline"
+          />
+        </div>
+        <span className="text-[11px] font-mono text-zinc-400 min-w-[34px]">
+          {formatTime(duration)}
+        </span>
       </div>
 
-      {/* 2. Main Controls & Seekbar (Center) */}
-      <div className="flex flex-col items-center justify-center space-y-1.5 flex-1 max-w-xl px-2 sm:px-6">
-        {/* Buttons */}
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => onSeek(0)}
-            disabled={!currentVideo}
-            title="Restart track"
-            className="p-1.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
+      {/* ========================================================================= */}
+      {/* 2. MAIN CONTROLS ROW (Mobile: Info + Buttons | Desktop: 3-column layout)  */}
+      {/* ========================================================================= */}
+      <div className="flex items-center justify-between w-full">
+        {/* Track Info (Left) */}
+        <div className="flex items-center space-x-2.5 sm:space-x-3 flex-1 sm:flex-initial sm:w-1/4 min-w-0 sm:min-w-[140px] sm:max-w-[280px]">
+          {currentVideo ? (
+            <>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-surface-base border border-surface-border flex-shrink-0">
+                {currentVideo.thumbnail ? (
+                  <img
+                    src={currentVideo.thumbnail}
+                    alt={currentVideo.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                    <Music className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </div>
+                )}
+              </div>
+              <div className="overflow-hidden pr-2 sm:pr-0">
+                <h4 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">
+                  {currentVideo.title}
+                </h4>
+                <p className="text-[11px] sm:text-xs text-zinc-400 truncate">
+                  {currentVideo.channelTitle || "YouTube Music"}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="text-xs text-zinc-500 italic">No track playing</div>
+          )}
+        </div>
 
+        {/* Center Controls (Buttons + Desktop Seekbar) */}
+        <div className="flex flex-col items-center justify-center space-y-1.5 flex-shrink-0 sm:flex-1 sm:max-w-xl sm:px-6">
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            <button
+              onClick={() => onSeek(0)}
+              disabled={!currentVideo}
+              title="Restart track"
+              className="p-2 sm:p-1.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={onTogglePlay}
+              disabled={!currentVideo}
+              title={isPlaying ? "Pause" : "Play"}
+              className="w-10 h-10 sm:w-10 sm:h-10 rounded-full bg-white hover:bg-brand-400 text-black flex items-center justify-center transition-all transform active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+            >
+              {isPlaying ? (
+                <Pause className="w-5 h-5 fill-current" />
+              ) : (
+                <Play className="w-5 h-5 fill-current translate-x-0.5" />
+              )}
+            </button>
+
+            <button
+              onClick={onSkipNext}
+              disabled={!currentVideo}
+              title="Skip to next queued song"
+              className="p-2 sm:p-1.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Desktop-Only Integrated Seekbar */}
+          <div className="hidden sm:flex w-full items-center space-x-2 text-[11px] font-mono text-zinc-400">
+            <span className="w-10 text-right">{formatTime(currentTime)}</span>
+            <div className="relative flex-1 flex items-center py-1">
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                step={0.5}
+                value={currentTime}
+                disabled={!currentVideo}
+                onChange={(e) => onSeek(parseFloat(e.target.value))}
+                className="seek-slider w-full h-5"
+                aria-label="Seek timeline"
+              />
+            </div>
+            <span className="w-10">{formatTime(duration)}</span>
+          </div>
+        </div>
+
+        {/* Volume & Output Controls (Right - Hidden on mobile, visible on sm: screens) */}
+        <div className="hidden sm:flex items-center justify-end space-x-2 w-1/4 min-w-[100px] max-w-[200px]">
           <button
-            onClick={onTogglePlay}
-            disabled={!currentVideo}
-            title={isPlaying ? "Pause" : "Play"}
-            className="w-10 h-10 rounded-full bg-white hover:bg-brand-400 text-black flex items-center justify-center transition-all transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+            onClick={onToggleMute}
+            title={isMuted ? "Unmute" : "Mute"}
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors"
           >
-            {isPlaying ? (
-              <Pause className="w-5 h-5 fill-current" />
+            {isMuted || volume === 0 ? (
+              <VolumeX className="w-4 h-4 text-red-400" />
             ) : (
-              <Play className="w-5 h-5 fill-current translate-x-0.5" />
+              <Volume2 className="w-4 h-4" />
             )}
           </button>
-
-          <button
-            onClick={onSkipNext}
-            disabled={!currentVideo}
-            title="Skip to next queued song"
-            className="p-1.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <SkipForward className="w-4 h-4" />
-          </button>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={isMuted ? 0 : volume}
+            onChange={(e) => onVolumeChange(parseInt(e.target.value, 10))}
+            className="w-16 sm:w-24 h-1 bg-surface-highlight rounded-lg appearance-none cursor-pointer accent-brand-500"
+          />
         </div>
-
-        {/* Seekbar */}
-        <div className="w-full flex items-center space-x-2 text-[11px] font-mono text-zinc-400">
-          <span className="w-10 text-right">{formatTime(currentTime)}</span>
-          <div className="relative flex-1 flex items-center group">
-            <input
-              type="range"
-              min={0}
-              max={duration || 100}
-              step={0.5}
-              value={currentTime}
-              disabled={!currentVideo}
-              onChange={(e) => onSeek(parseFloat(e.target.value))}
-              className="w-full h-1 bg-surface-highlight rounded-lg appearance-none cursor-pointer group-hover:h-1.5 transition-all"
-            />
-          </div>
-          <span className="w-10">{formatTime(duration)}</span>
-        </div>
-      </div>
-
-      {/* 3. Volume & Output Controls (Right) */}
-      <div className="flex items-center justify-end space-x-2 w-1/4 min-w-[100px] max-w-[200px]">
-        <button
-          onClick={onToggleMute}
-          title={isMuted ? "Unmute" : "Mute"}
-          className="p-1.5 text-zinc-400 hover:text-zinc-100 transition-colors"
-        >
-          {isMuted || volume === 0 ? (
-            <VolumeX className="w-4 h-4 text-red-400" />
-          ) : (
-            <Volume2 className="w-4 h-4" />
-          )}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={isMuted ? 0 : volume}
-          onChange={(e) => onVolumeChange(parseInt(e.target.value, 10))}
-          className="w-16 sm:w-24 h-1 bg-surface-highlight rounded-lg appearance-none cursor-pointer"
-        />
       </div>
     </div>
   );
