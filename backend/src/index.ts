@@ -20,6 +20,11 @@ app.use(
     origin: "*",
   }),
 );
+app.use((req, res, next) => {
+  // Normalize multiple slashes (e.g. //api/search -> /api/search)
+  req.url = req.url.replace(/\/+/g, "/");
+  next();
+});
 app.use(express.json());
 
 // Routes
